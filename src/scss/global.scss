@@ -1,0 +1,34 @@
+@use "fonts/Commissioner";
+@use "fonts/KoHo";
+@use "fonts/M-Plus-1p";
+@use "fonts/Montserrat";
+@use "fonts/Nunito";
+@use "fonts/Outfit";
+@use "fonts/Prompt";
+@use "fonts/Ubuntu";
+@use "./variables";
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body{
+  background-color: #121212;
+  color: #ccc;
+  // font-family: "Commissioner";
+  // font-family: "KoHo";
+  // font-family: "M Plus 1p";
+  // font-family: "Montserrat";
+  // font-family: "Nunito";
+  // font-family: "Outfit";
+  // font-family: "Prompt";
+  // font-family: "Ubuntu";
+
+  font-family: var(--font-text);
+}
+
+button {
+  font-family: var(--font-text);
+}
