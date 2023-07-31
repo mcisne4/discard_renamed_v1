@@ -1,0 +1,8 @@
+[workspace]
+members = [
+  "src-tauri",
+  "rs_dev",
+  "rs_fs",
+  "rs_rename",
+  "rs_errors"
+]
