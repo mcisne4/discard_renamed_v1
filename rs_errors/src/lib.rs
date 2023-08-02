@@ -1,14 +1,48 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+use serde::Serialize;
+
+/// # Properties:
+/// - `error`: `String` - Main description of the error
+/// - `info`: `String` - More information about the error
+#[derive(Debug, Serialize)]
+pub struct RenamedError {
+    pub error: String,
+    pub info: String,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Type alias: `RenamedResult`
+///
+/// # Example:
+/// ```
+/// use rs_errors::{RenamedResult, create_error};
+///
+/// fn sample_fn() -> RenamedResult<()> {
+///   match some_result {
+///     Ok(_) => Ok(()),
+///     Err(e) => Err(create_error("Error", e)),
+///   }
+/// }
+/// ```
+pub type RenamedResult<T> = std::result::Result<T, RenamedError>;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+/// Creates a `RenamedError`
+/// # Arguments:
+/// - `error` - Main description of the error
+/// - `info` - More information about the error
+///
+/// # Example:
+/// ```
+/// use rs_errors::{RenamedResult, create_error};
+///
+/// fn sample_fn() -> RenamedResult<()> {
+///   match some_result {
+///     Ok(_) => Ok(()),
+///     Err(e) => Err(create_error("Error", e)),
+///   }
+/// }
+/// ```
+pub fn create_error(error: impl Into<String>, info: impl Into<String>) -> RenamedError {
+    RenamedError {
+        error: error.into(),
+        info: info.into(),
     }
 }
