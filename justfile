@@ -3,7 +3,7 @@ dev: build
   @cd rs_dev && cargo watch -x run
 
 # Run Tauri in dev mode
-tauri: build-errors && build-fs build-rename
+tauri: build-response && build-db build-fs build-rename
   @yarn tauri dev
 
 # ===================== #
@@ -11,8 +11,7 @@ tauri: build-errors && build-fs build-rename
 # ===================== #
 
 # Build: 'rs_dev' and all dependencies
-build: build-errors && build-fs build-rename build-dev
-  @cargo build
+build: build-response && build-db build-fs build-rename build-dev
 
 # Build: All
 build-all:
@@ -30,16 +29,24 @@ build-fs:
 build-rename:
   @cargo build -p rs_rename
 
-# Build: 'rs_errors'
-build-errors:
-  @cargo build -p rs_errors
+# Build: 'rs_response'
+build-response:
+  @cargo build -p rs_response
+
+# Build: 'rs_db'
+build-db:
+  @cargo build -p rs_db
 
 # =========================== #
 # === MODULE TREE SCRIPTS === #
 # =========================== #
 
 # Module Tree: All
-mods: mods-dev && mods-fs mods-rename mods-errors
+mods: mods-db && mods-dev mods-fs mods-rename mods-response
+
+# Module Tree: 'rs_db'
+mods-db:
+  @cargo-modules generate tree -p rs_db --types --traits --fns
 
 # Module Tree: 'rs_dev'
 mods-dev:
@@ -53,6 +60,7 @@ mods-fs:
 mods-rename:
   @cargo-modules generate tree -p rs_rename --types --traits --fns
 
-# Module Tree: 'rs_errors'
-mods-errors:
-  @cargo-modules generate tree -p rs_errors --types --traits --fns
+# Module Tree: 'rs_response'
+mods-response:
+  @cargo-modules generate tree -p rs_response --types --traits --fns
+

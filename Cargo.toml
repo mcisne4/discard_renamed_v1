@@ -2,7 +2,8 @@
 members = [
   "src-tauri",
   "rs_dev",
+  "rs_response",
+  "rs_db",
   "rs_fs",
   "rs_rename",
-  "rs_errors"
 ]
