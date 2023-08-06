@@ -1,23 +1,45 @@
-// use rusqlite::Connection;
-// use std::env::current_dir;
-use std::path::PathBuf;
+use rs_response::Toast;
+use rusqlite::Connection;
+use std::fs;
 
-pub fn connect(_data_dir: Option<PathBuf>) {
-    // let app_data_dir = match data_dir {
-    //     Some(dir) => dir.join("com.renamed.app").join("db"),
-    //     None => {
-    //         let current_dir = current_dir()
-    //             .map_err(|e| create_error("Failed to get current directory", e.to_string()));
-    //         //
-    //         PathBuf::from("./").join("com.renamed.app").join("app")
-    //     }
-    // };
+pub enum DB {
+    Settings,
+}
+impl DB {
+    pub fn connect(&self) -> Result<Connection, Toast> {
+        let db_dir = match dirs_next::data_dir() {
+            Some(dir) => dir.join("com.renamed.app/db/"),
+            None => {
+                return Err(Toast::new_error_toast(
+                    "Database",
+                    "Database path could not be established",
+                    Some("Could not determine the data directory path"),
+                ));
+            }
+        };
 
-    // eprintln!("APP DATA DIR: {}", app_data_dir.display());
+        fs::create_dir_all(db_dir.clone()).map_err(|e| {
+            Toast::new_error_toast(
+                "Database",
+                "Unable to access the database directory",
+                Some(e.to_string().as_str()),
+            )
+        })?;
 
-    // let db = Connection::open(app_data_dir);
-    // match db {
-    //     Ok(_conn) => eprintln!("Connected"),
-    //     Err(_e) => eprintln!("Not Connected"),
-    // }
+        let db_name = match self {
+            DB::Settings => "settings.db",
+        };
+
+        let db_path = db_dir.join(db_name);
+
+        let db = Connection::open(db_path).map_err(|e| {
+            Toast::new_error_toast(
+                "Database",
+                format!("Unable to open the '{}' database", db_name).as_str(),
+                Some(e.to_string().as_str()),
+            )
+        })?;
+
+        Ok(db)
+    }
 }

@@ -5,7 +5,7 @@ use serde::Serialize;
 /// - `INFO` - For toasts detailing a successful operation
 /// - `WARNING` - For toasts describing a warning message
 /// - `ERROR` - For toasts describing an error message
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub enum ToastType {
     INFO,
     WARNING,
@@ -49,7 +49,7 @@ pub enum ToastType {
 ///   }
 /// }
 /// ```
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Toast {
     pub toast_type: ToastType,
     pub category: String,
