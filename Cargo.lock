@@ -2179,6 +2179,7 @@ dependencies = [
  "dirs-next",
  "rs_response",
  "rusqlite",
+ "serde",
 ]
 
 [[package]]

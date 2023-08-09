@@ -1,12 +1,10 @@
-fn db_connect() {
-    match rs_db::DB::Settings.connect() {
-        Ok(_) => eprintln!("\nSUCCESSFULLY CONNECTED TO 'settings' DATABASE"),
-        Err(e) => eprintln!("\n{:#?}\nERROR CONNECTING TO 'settings' DATABASE", e),
-    }
-}
+mod dev_rs_db;
 
 fn main() {
     println!("Hello, world!");
 
-    db_connect();
+    match dev_rs_db::dev_rs_db(true) {
+        Ok(_) => eprintln!("'dev_rs_db': Completed Successfully\n"),
+        Err(e) => eprintln!("'dev_rs_db': ERROR:\n{:#?}\n", e),
+    }
 }

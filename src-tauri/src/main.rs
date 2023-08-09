@@ -8,10 +8,10 @@ fn greet(name: &str) -> String {
 }
 
 fn main() {
-    match rs_db::DB::Settings.connect() {
-        Ok(_db) => println!("Connected to Settings db"),
-        Err(errs) => eprintln!("Error connecting to settings db:\n{:#?}", errs),
-    }
+    // match rs_db::DB::Settings.connect() {
+    //     Ok(_db) => println!("Connected to Settings db"),
+    //     Err(errs) => eprintln!("Error connecting to settings db:\n{:#?}", errs),
+    // }
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![greet,])
