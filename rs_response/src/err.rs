@@ -67,11 +67,11 @@ impl ErrorRepsonse {
     ///   }
     /// }
     /// ```
-    pub fn new_error<Str: Into<String>>(
-        category: Str,
-        message: Str,
-        cause: Str,
-        source: Str,
+    pub fn new_error(
+        category: impl Into<String>,
+        message: impl Into<String>,
+        cause: impl Into<String>,
+        source: impl Into<String>,
     ) -> Self {
         Self {
             category: category.into(),
