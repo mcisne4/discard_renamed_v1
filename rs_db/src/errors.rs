@@ -2,6 +2,9 @@ use rs_response::ErrorRepsonse;
 
 pub enum DbError {
     CONNECT,
+    // SettingsGET,
+    // SettingsINIT,
+    SettingsDb,
 }
 impl DbError {
     pub fn create_error(
@@ -15,7 +18,10 @@ impl DbError {
             details.into(),
             String::from("rs_db::")
                 + match self {
-                    Self::CONNECT => "connect::connect()",
+                    Self::CONNECT => "connection::connect()",
+                    // Self::SettingsINIT => "settings::init::init()",
+                    // Self::SettingsGET => "settings::get_settings::get_settings()",
+                    Self::SettingsDb => "settings_db::settings::SettingsDB",
                 },
         )
     }

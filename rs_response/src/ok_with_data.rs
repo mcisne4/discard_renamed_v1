@@ -39,16 +39,16 @@ pub struct WarningWithData<T> {
 ///
 /// # Example:
 /// ```
-/// use rs_response::{ResponseVecWithData, OkResponse};
+/// use rs_response::{ResponseVecWithData, OkDataResponse};
 ///
 /// fn some_fn() -> ResponseVecWithData<usize> {
-///   let info = OkResponse::new_info_with_data(
+///   let info = OkDataResponse::new_info_with_data(
 ///     "Test",
 ///     "This is an INFO result",
 ///     34_usize,
 ///   );
 ///
-///   let warn = OkResponse::new_warning_with_data(
+///   let warn = OkDataResponse::new_warning_with_data(
 ///     "Test",
 ///     "This is a WARNING result",
 ///     16_usize,
