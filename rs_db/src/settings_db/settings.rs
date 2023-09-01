@@ -1,311 +1,391 @@
-use super::util::DB_DISPLAY_NAME;
-use crate::errors::DbError;
+use crate::database;
+use crate::error_factory::create_error;
 use rs_response::DataResponse;
+use serde::ser::{Serialize, SerializeStruct};
 
-/// A 'Settings' object to return to the frontend
-///
-/// **NOTE:** The `Settings` object should be created
-/// from a `SettingsDB` item using the `to_settings`
-/// method
-///
-/// # Example:
-/// ```
-/// use rs_db::settings_db::{Settings, SettingsDB};
-/// use rs_response::{ResponseWithData, OkDataResponse};
-///
-/// fn get_settings() -> ResponseWithData<Settings> {
-///   let default_settings = Settings::default();
-///   let settings = default_settings.to_settings();
-///
-///   Ok(OkDataResponse::new_info(
-///     "Example",
-///     "These are the default settings",
-///     settings,
-///   ))
-/// }
-/// ```
-#[derive(serde::Serialize)]
-pub struct Settings {
-    pub theme: String,
-    pub show_welcome_screen: bool,
-    pub show_db_notif: bool,
-    pub show_confirm_notif: bool,
-}
+const ERR_SRC: &str = "settings_db::settings::Settings";
+const ERR_SRC2: &str = "settings_db::settings::SettingsTable";
+const DB_NAME: &str = "settings";
+const DB_DISPLAY_NAME: &str = "Settings";
+const DB_ID: &str = "'main'";
 
-/// A data structure for interacting with *Settings*
-/// data from the database.
+/// Data structure for interacting with the 'Settings' database and the frontend
 ///
-/// **NOTE:** To return *Settings* data to the frontend,
-/// convert the `SettingsDB` data to a `Settings` object
-/// usng the `to_settings` method
+/// **NOTE:** While properties are private, the data can be serialized when
+/// sending it to the frontend
 ///
-/// # Properties:
-/// - `theme`: `u8` - The UI theme used by the frontend
-///   - Value: `0` - "DARK" theme *(default)*
-///   - Value: `1` - "LIGHT" theme
-/// - `show_welcome_screen`: `u8` - Whether to show the *Welcome* screen on startup
-///   - Value: `0` - false
-///   - Value: `1` - true *(default)*
-/// - `show_db_notif`: `u8` - Whether to show notifications related to database changes
-///   - Value: `0` - false *(default)*
-///   - Value: `1` - true
-/// - `show_confirm_notif`: `u8` - Whether to show the *Confirm* dialog when executing a rename
-///   - Value: `0` - false
-///   - Value: `1` - true *(default)*
+/// # Properties *(private)*:
+/// - `theme`: `String` - The current UI theme. Acceptable values are `"DARK"` and `"LIGHT"`
+/// - `welcome_screen`: `bool` - Whether to show the *Welcome* screen on startup
+/// - `db_notifs`: `bool` - Whether to show database notifications
+/// - `confirm_rename`: `bool` - Whether to show the *Confirm Rename* dialog on renaming
 ///
 /// # Methods:
-/// - `new` - Create a new `SettingsDB` item from provided values
-/// - `default` - Creates a new `SettingsDB` item with default values
-/// - `parse` - Creates a new `SettingsDB` item from data from the frontend
-/// - `to_settings` - Converts the `SettingsDB` data into a `Settings` object for the frontend
+/// - `default_settings` - Creates a `Settings` item with default values
+/// - `parse_settings` - Creates a `Settings` item from parsed data from the frontend
+/// - `write` - Writes the `Settings` data to the database
+/// - `read` - Reads `Settings` data from the database if available. Otherwise, writes default
+/// values to the database and returns it
 ///
 /// # Example:
 /// ```
-/// use rs_db::settings_db::{Settings, SettingsDB};
-/// use rs_response::{ResponseWithData, OkDataResponse};
+/// use rs_db::settings_db::Settings;
+/// use rs_response::DataResponse;
 ///
-/// fn get_settings() -> ResponseWithData<Settings> {
-///   let default_settings = Settings::default();
-///   let settings = default_settings.to_settings();
+/// fn set_default_settings() -> DataResponse<()> {
+///   let default_settings = Settings::default_settings();
 ///
-///   Ok(OkDataResponse::new_info(
-///     "Example",
-///     "These are the default settings",
-///     settings,
-///   ))
+///   default_settings.write()?;
+///
+///   Ok(())
 /// }
 /// ```
-#[derive(Debug)]
-pub struct SettingsDB {
-    pub theme: u8,
-    pub show_welcome_screen: u8,
-    pub show_db_notif: u8,
-    pub show_confirm_notif: u8,
+pub struct Settings {
+    theme: String,
+    welcome_screen: bool,
+    db_notifs: bool,
+    confirm_rename: bool,
 }
-impl SettingsDB {
-    /// Create a new `SettingsDB` item from provided values
+impl Serialize for Settings {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("Settings", 4)?;
+
+        state.serialize_field("theme", &self.theme)?;
+        state.serialize_field("welcome_screen", &self.welcome_screen)?;
+        state.serialize_field("db_notifs", &self.db_notifs)?;
+        state.serialize_field("confirm_rename", &self.confirm_rename)?;
+
+        state.end()
+    }
+}
+impl Settings {
+    /// Creates a new `Settings` item
+    ///
+    /// **NOTE:** The data is not validated to ensure it conforms
+    /// to the required format. Use the `default_settings` and
+    /// `parse_settings` methods to create a validated `Settings`
+    /// item
+    ///
+    /// **NOTE:** The `Settings` data is not written to the database
     ///
     /// # Arguments:
-    /// - `theme`: `u8` - The UI theme used by the frontend
-    ///   - Value: `0` - "DARK" theme
-    ///   - Value: `1` - "LIGHT" theme
-    /// - `show_welcome_screen`: `u8` - Whether to show the *Welcome* screen on startup
-    ///   - Value: `0` - False
-    ///   - Value: `1` - True
-    /// - `show_db_notif`: `u8` - Whether to show notifications related to database changes
-    ///   - Value: `0` - False
-    ///   - Value: `1` - True
-    /// - `show_confirm_notif`: `u8` - Whether to show the *Confirm* dialog when executing a rename
-    ///   - Value: `0` - False
-    ///   - Value: `1` - True
+    /// - `theme`: `impl Into<String>` - The current UI theme. Acceptable values are `"DARK"` and `"LIGHT"`
+    /// - `welcome_screen`: `bool` - Whether to show the *Welcome* screen on startup
+    /// - `db_notifs`: `bool` - Whether to show database notifications
+    /// - `confirm_rename`: `bool` - Whether to show the *Confirm Rename* dialog on renaming
+    fn new(
+        theme: impl Into<String>,
+        welcome_screen: bool,
+        db_notifs: bool,
+        confirm_rename: bool,
+    ) -> Self {
+        Self {
+            theme: theme.into(),
+            welcome_screen,
+            db_notifs,
+            confirm_rename,
+        }
+    }
+
+    /// Creates a `Settings` item from parsed data from the frontend
+    ///
+    /// **NOTE:** The `Settings` data is not written to the database
+    ///
+    /// # Defautl Values:
+    ///
+    /// | Property         | Value    | Description                                  |
+    /// | ---------------- | -------- | -------------------------------------------- |
+    /// | `theme`          | `"DARK"` | Use the "DARK" theme                         |
+    /// | `welcome_screen` | `true`   | Show the *Welcome* screen on startup         |
+    /// | `db_notifs`      | `false`  | Do not show database notifications           |
+    /// | `confirm_rename` | `true`   | Show the *Confirm Rename* dialog on renaming |
     ///
     /// # Example:
     /// ```
-    /// use rs_db::settings_db::SettingsDB;
+    /// use rs_db::settings_db::Settings;
+    /// use rs_response::DataResponse;
     ///
-    /// fn my_custom_settings() -> SettingsDB {
-    ///   let theme = 1_u8;
-    ///   let show_welcome_screen: 0_u8;
-    ///   let show_db_notif: 0_u8;
-    ///   let show_confirm_notif: 0_u8;
+    /// fn reset_settings() -> DataResponse<Settings> {
+    ///   let default_settings = Settings::default_settings();
     ///
-    ///   SettingsDB::new(
+    ///   default_settings.write()?;
+    ///
+    ///   Ok(default_settings)
+    /// }
+    /// ```
+    pub fn default_settings() -> Self {
+        Self {
+            theme: String::from("DARK"),
+            welcome_screen: true,
+            db_notifs: false,
+            confirm_rename: true,
+        }
+    }
+
+    /// Creates a `Settings` item from parsed data from the frontend
+    ///
+    /// **NOTE:** The `Settings` data is not written to the database
+    ///
+    /// # Arguments:
+    /// - `theme`: `impl Into<String>` - The current UI theme. Acceptable values are `"DARK"` and `"LIGHT"`
+    /// - `welcome_screen`: `bool` - Whether to show the *Welcome* screen on startup
+    /// - `db_notifs`: `bool` - Whether to show database notifications
+    /// - `confirm_rename`: `bool` - Whether to show the *Confirm Rename* dialog on renaming
+    ///
+    /// # Example:
+    /// ```
+    /// use rs_db::Settings;
+    /// use rs_response::{OkResponse, Response};
+    ///
+    /// #[tauri::command]
+    /// fn update_settings(
+    ///   theme: String,
+    ///   welcome_screen: bool,
+    ///   db_notifs: bool,
+    ///   confirm_rename: bool
+    /// ) -> Response {
+    ///   let settings = Settings::parse_settings(
     ///     theme,
-    ///     show_welcome_screen,
-    ///     show_db_notif,
-    ///     show_confirm_notif,
+    ///     welcome_screen,
+    ///     db_notifs,
+    ///     confirm_rename,
+    ///   )?;
+    ///
+    ///   settings.write()?;
+    ///
+    ///   Ok(
+    ///     OkResponse::new_info(
+    ///       "Database",
+    ///       "The 'Settings' have been reset"
+    ///     )
     ///   )
     /// }
     /// ```
-    pub fn new(
-        theme: u8,
-        show_welcome_screen: u8,
-        show_db_notif: u8,
-        show_confirm_notif: u8,
-    ) -> Self {
-        Self {
-            theme,
-            show_welcome_screen,
-            show_db_notif,
-            show_confirm_notif,
-        }
-    }
+    pub fn parse_settings(
+        theme: impl Into<String>,
+        welcome_screen: bool,
+        db_notifs: bool,
+        confirm_rename: bool,
+    ) -> DataResponse<Self> {
+        let message = format!("Invalid data was provided for '{}'", DB_DISPLAY_NAME);
 
-    /// Creates a new `SettingsDB` item with default values
-    ///
-    /// # Default Values:
-    ///
-    /// | Property              | Value  | Description                                   |
-    /// | ----------------------| -------| --------------------------------------------- |
-    /// | `theme`               | `0_u8` | Use the "DARK" theme                          |
-    /// | `show_welcome_screen` | `1_u8` | Show the *Welcome* screen on startup          |
-    /// | `show_db_notif`       | `0_u8` | Do not show database notifications            |
-    /// | `show_confirm_notif`  | `1_u8` | Show *Confirm* dialog when executing a rename |
-    ///
-    /// # Example:
-    /// ```
-    /// use rs_db::settings_db::SettingsDB;
-    /// use rs_response::DataResponse;
-    ///
-    /// fn get_defult_theme() -> &str {
-    ///   let settings = SettingsDB::default();
-    ///
-    ///   match settings.theme {
-    ///     0 => "Dark Theme",
-    ///     _ => "Light Theme",
-    ///   }
-    /// }
-    /// ```
-    pub fn default() -> Self {
-        Self {
-            theme: 0,
-            show_welcome_screen: 1,
-            show_db_notif: 0,
-            show_confirm_notif: 1,
-        }
-    }
-
-    /// Creates a new `SettingsDB` item from data from the frontend
-    ///
-    /// # Arguments:
-    /// - `theme`: `String` - The UI theme used by the frontend. Acceptable values are either `"DARK"` or `"LIGHT"`
-    /// - `show_welcome_screen`: `bool` - Whether to show the *Welcome* screen on startup
-    /// - `show_db_notif`: `bool` - Whether to show notifications related to database changes
-    /// - `show_confirm_notif`: `bool` - Whether to show the *Confirm* dialog when executing a rename
-    ///
-    /// # Example:
-    /// ```
-    /// use rs_db::settings_db::SettingsDB;
-    /// use rs_response::{OkResponse, ResponseVec};
-    ///
-    /// #[tauri::command]
-    /// fn get_user_disabled_settings(
-    ///   theme: String,
-    ///   show_welcome_screen: bool,
-    ///   show_db_notif: bool,
-    ///   show_confirm_notif: bool,
-    /// ) -> ResponseVec {
-    ///   let settings = SettingsDB::parse(
-    ///     theme,
-    ///     show_welcome_screen,
-    ///     show_db_notif,
-    ///     show_confirm_notif,
-    ///   );
-    ///
-    ///   let mut disabled_settings: Vec<OkResponse> = vec![];
-    ///
-    ///   if settings.show_welcome_screen == 0 {
-    ///     disabled_settings.push(
-    ///       OkResponse::new_info(
-    ///         "Settings",
-    ///         "The 'Welcome' screen on startup is disabled"
-    ///       )
-    ///     );
-    ///   }
-    ///
-    ///   if settings.show_db_notif == 0 {
-    ///     disabled_settings.push(
-    ///       OkResponse::new_info(
-    ///         "Settings",
-    ///         "Database notifications are disabled"
-    ///       )
-    ///     );
-    ///   }
-    ///
-    ///   if settings.show_confirm_notif == 0 {
-    ///     disabled_settings.push(
-    ///       OkResponse::new_info(
-    ///         "Settings",
-    ///         "The 'Confirm' notification on renaming is disabled"
-    ///       )
-    ///     );
-    ///   }
-    ///
-    ///   Ok(disabled_settings)
-    /// }
-    /// ```
-    pub fn parse(
-        theme: String,
-        show_welcome_screen: bool,
-        show_db_notif: bool,
-        show_confirm_notif: bool,
-    ) -> DataResponse<SettingsDB> {
-        let err_msg = format!("Could not parse the provided '{}' data", DB_DISPLAY_NAME);
-
-        let theme = match theme.to_uppercase().as_str() {
-            "DARK" => 0_u8,
-            "LIGHT" => 1_u8,
+        let theme: String = theme.into();
+        let theme = theme.to_uppercase();
+        let theme = match theme.as_str() {
+            "DARK" => theme,
+            "LIGHT" => theme,
             _ => {
-                return Err(DbError::SettingsDb.create_error(
-                    err_msg,
-                    format!(
-                        "'{}' is not a valid value for the 'theme'. The 
-                    'theme' value should either be 'DARK' or 'LIGHT'",
-                        theme
-                    ),
+                return Err(create_error(
+                    message,
+                    format!("'{}' is not a valid value for 'theme'", theme),
+                    ERR_SRC,
                 ))
             }
         };
 
-        let show_welcome_screen = match show_welcome_screen {
-            false => 0_u8,
-            true => 1_u8,
-        };
-
-        let show_db_notif = match show_db_notif {
-            false => 0_u8,
-            true => 1_u8,
-        };
-
-        let show_confirm_notif = match show_confirm_notif {
-            false => 0_u8,
-            true => 1_u8,
-        };
-
-        Ok(Self {
-            theme,
-            show_welcome_screen,
-            show_db_notif,
-            show_confirm_notif,
-        })
+        Ok(Self::new(theme, welcome_screen, db_notifs, confirm_rename))
     }
 
-    /// Converts the `SettingsDB` data into a `Settings` object for the frontend
+    /// Writes the `Settings` data to the database
+    ///
+    /// **NOTE:** Data is validated prior to being written
+    /// to the database
+    pub fn write(&self) -> DataResponse<()> {
+        let db = database::connect(DB_DISPLAY_NAME, DB_NAME)?;
+
+        let settings_table = SettingsTable::from_settings(self)?;
+
+        let sqlite_stmt = format!(
+            "INSERT or REPLACE INTO {} (
+                id,
+                theme,
+                welcome_screen,
+                db_notifs,
+                confirm_rename
+            ) VALUES (
+                {},
+                {},
+                {},
+                {},
+                {}
+            );",
+            DB_NAME,
+            DB_ID,
+            settings_table.theme,
+            settings_table.welcome_screen,
+            settings_table.db_notifs,
+            settings_table.confirm_rename
+        );
+
+        db.execute(&sqlite_stmt, []).map_err(|e| {
+            create_error(
+                format!("Could not write '{}' data to the database", DB_DISPLAY_NAME),
+                e.to_string(),
+                ERR_SRC,
+            )
+        })?;
+
+        Ok(())
+    }
+
+    /// Reads `Settings` data from the database
+    ///
+    /// **NOTE:** If no previous `Settings` data is found, default
+    /// values will be written to the database and retrieved
+    ///
+    /// **NOTE:** Data from the database is validated to ensure
+    /// proper formatting
     ///
     /// # Example:
     /// ```
-    /// use rs_db::settings_db::{Settings, SettingsDB};
-    /// use rs_response::{ResponseWithData, OkDataResponse};
+    /// use rs_db::Settings;
+    /// use rs_response::DataResponse;
     ///
-    /// fn get_settings() -> ResponseWithData<Settings> {
-    ///   let default_settings = Settings::default();
-    ///   let settings = default_settings.to_settings();
+    /// fn get_settings() -> DataResponse<Settings> {
+    ///   let settings = Settings::read()?;
     ///
-    ///   Ok(OkDataResponse::new_info(
-    ///     "Example",
-    ///     "These are the default settings",
-    ///     settings,
-    ///   ))
+    ///   Ok(settings)
     /// }
     /// ```
-    pub fn to_settings(&self) -> Settings {
-        Settings {
-            theme: match self.theme {
-                0 => String::from("DARK"),
-                _ => String::from("LIGHT"),
+    pub fn read() -> DataResponse<Self> {
+        let db = database::connect(DB_DISPLAY_NAME, DB_NAME)?;
+
+        let sqlite_stmt = format!("SELECT * FROM {} WHERE id = {};", DB_DISPLAY_NAME, DB_ID);
+
+        let row = db.query_row(&sqlite_stmt, [], |row| {
+            let _id = row.get::<usize, String>(0)?;
+            let theme = row.get::<usize, u8>(1)?;
+            let welcome_screen = row.get::<usize, u8>(2)?;
+            let db_notifs = row.get::<usize, u8>(3)?;
+            let confirm_rename = row.get::<usize, u8>(4)?;
+
+            Ok(SettingsTable::new(
+                theme,
+                welcome_screen,
+                db_notifs,
+                confirm_rename,
+            ))
+        });
+
+        let settings = match row {
+            Ok(settings_table) => settings_table.to_settings()?,
+            Err(e) => match e {
+                rusqlite::Error::QueryReturnedNoRows => {
+                    let defaults = Self::default_settings();
+                    defaults.write()?;
+                    defaults
+                }
+                _ => {
+                    return Err(create_error(
+                        format!(
+                            "Unable to read values from the '{}' database",
+                            DB_DISPLAY_NAME
+                        ),
+                        e.to_string(),
+                        ERR_SRC,
+                    ))
+                }
             },
-            show_welcome_screen: match self.show_welcome_screen {
-                0 => false,
-                _ => true,
-            },
-            show_db_notif: match self.show_db_notif {
-                0 => false,
-                _ => true,
-            },
-            show_confirm_notif: match self.show_confirm_notif {
-                0 => false,
-                _ => true,
-            },
+        };
+
+        Ok(settings)
+    }
+}
+
+/// A data structure used to interact with the 'settings' database
+///
+/// # Methods:
+/// - `new` - Creates a new `SettingsTable` item
+/// - `from_settings` - Converts `Settings` data to `SettingsTable` data
+/// - `to_settings` - Converts `SettingsTable` data to `Settings` data
+struct SettingsTable {
+    theme: u8,
+    welcome_screen: u8,
+    db_notifs: u8,
+    confirm_rename: u8,
+}
+impl SettingsTable {
+    /// Creates a new `SettingsTable` item
+    ///
+    /// **NOTE:** The `SettingsTable` data is not validated
+    pub fn new(theme: u8, welcome_screen: u8, db_notifs: u8, confirm_rename: u8) -> Self {
+        Self {
+            theme,
+            welcome_screen,
+            db_notifs,
+            confirm_rename,
         }
+    }
+
+    /// Converts `Settings` data to `SettingsTable` data
+    ///
+    /// **NOTE:** Data is validated to ensure proper formatting
+    pub fn from_settings(settings: &Settings) -> DataResponse<Self> {
+        Ok(Self {
+            theme: match settings.theme.as_str() {
+                "DARK" => 0,
+                "LIGHT" => 1,
+                _ => {
+                    return Err(create_error(
+                        format!(
+                            "Unable to convert '{}' data to write to the database",
+                            DB_DISPLAY_NAME
+                        ),
+                        format!("'{}' is not a valid 'theme' value", settings.theme),
+                        ERR_SRC,
+                    ))
+                }
+            },
+            welcome_screen: match settings.welcome_screen {
+                true => 1,
+                false => 0,
+            },
+            db_notifs: match settings.db_notifs {
+                true => 1,
+                false => 0,
+            },
+            confirm_rename: match settings.confirm_rename {
+                true => 1,
+                false => 0,
+            },
+        })
+    }
+
+    /// Converts `SettingsTable` data to `Settings` data
+    ///
+    /// **NOTE:** Data is validated to ensure proper formatting
+    pub fn to_settings(&self) -> DataResponse<Settings> {
+        fn validate_0_or_1<T>(
+            key: &str,
+            value: u8,
+            if_value_is_0: T,
+            if_value_is_1: T,
+        ) -> DataResponse<T> {
+            match value {
+                0 => Ok(if_value_is_0),
+                1 => Ok(if_value_is_1),
+                _ => Err(create_error(
+                    format!(
+                        "Unable to parse the '{}' data from the database due to invalid data",
+                        DB_DISPLAY_NAME
+                    ),
+                    format!(
+                        "The '{}' value should be either 0 or 1, but found {}",
+                        key, value
+                    ),
+                    ERR_SRC2,
+                )),
+            }
+        }
+
+        Settings::parse_settings(
+            validate_0_or_1("theme", self.theme, "DARK", "LIGHT")?,
+            validate_0_or_1("welcome_screen", self.welcome_screen, false, true)?,
+            validate_0_or_1("db_notifs", self.db_notifs, false, true)?,
+            validate_0_or_1("confirm_rename", self.confirm_rename, false, true)?,
+        )
     }
 }

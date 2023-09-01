@@ -1,3 +1,2 @@
 mod settings;
-mod util;
-pub use settings::{Settings, SettingsDB};
+pub use settings::Settings;

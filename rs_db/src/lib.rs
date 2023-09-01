@@ -1,6 +1,4 @@
-pub mod errors;
-
-mod connection;
-use connection::connect;
+mod database;
+mod error_factory;
 
 pub mod settings_db;
