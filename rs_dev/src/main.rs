@@ -1,10 +1,18 @@
+use rs_response::Response;
 mod dev_rs_db;
 
 fn main() {
-    println!("Hello, world!");
+    eprintln!("=========================");
+    eprintln!("=== RUNNING: 'rs_dev' ===");
+    eprintln!("=========================\n");
 
-    match dev_rs_db::dev_rs_db(true) {
-        Ok(_) => eprintln!("'dev_rs_db': Completed Successfully\n"),
-        Err(e) => eprintln!("'dev_rs_db': ERROR:\n{:#?}\n", e),
+    dev_rs_db::dev_rs_db(true)
+}
+
+pub fn print_response(title: &str, results: Response) {
+    eprintln!("** DEV TEST: '{}' **", title);
+    match results {
+        Ok(data) => eprintln!("> OK:\n{:#?}\n", data),
+        Err(err) => eprintln!("> ERR:\n{:#?}\n", err),
     }
 }

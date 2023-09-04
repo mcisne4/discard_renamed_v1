@@ -5,9 +5,9 @@ use serde::ser::{Serialize, SerializeStruct};
 
 const ERR_SRC: &str = "settings_db::settings::Settings";
 const ERR_SRC2: &str = "settings_db::settings::SettingsTable";
-const DB_NAME: &str = "settings";
-const DB_DISPLAY_NAME: &str = "Settings";
-const DB_ID: &str = "'main'";
+pub const DB_NAME: &str = "settings";
+pub const DB_DISPLAY_NAME: &str = "Settings";
+pub const DB_ID: &str = "'main'";
 
 /// Data structure for interacting with the 'Settings' database and the frontend
 ///
